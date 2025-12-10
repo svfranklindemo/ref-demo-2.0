@@ -36,27 +36,6 @@
         "rootPath": "/content/cq:tags/world-bank"
       },
       {
-        "component": "date-time",
-        "valueType": "date",
-        "value": "2024-09-23T00:00:00.000Z",
-        "name": "content_date",
-        "required": true,
-        "label": "Date Of Content creation"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
-        "name": "hostname",
-        "label": "Hostname",
-        "description": "Provide the hostname of author instance (without the ending slash) e.g. https://author-pXXXXX-eXXXXXXX.adobeaemcloud.com"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
-        "name": "author",
-        "label": "Author"
-      },
-      {
           "component": "select",
           "name": "theme",
           "label": "Theme",

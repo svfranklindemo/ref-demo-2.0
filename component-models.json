@@ -16,45 +16,11 @@
       {
         "component": "text",
         "valueType": "string",
-        "name": "jcr:pagetitle",
-        "label": "Page Title"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
         "name": "jcr:description",
         "label": "Description"
       },
       {
-        "component": "aem-tag",
-        "name": "cq:tags",
-        "label": "Tags",
-        "valueType": "string",
-        "rootPath": "/content/cq:tags/wknd-universal"
-      },
-      {
-        "component": "date-time",
-        "valueType": "date",
-        "value": "2024-09-23T00:00:00.000Z",
-        "name": "content_date",
-        "required": true,
-        "label": "Date Of Content creation"
-      },
-       {
-        "component": "text",
-        "valueType": "string",
-        "name": "hostname",
-        "label": "Hostname",
-        "description": "Provide the hostname of author instance (without the ending slash) e.g. https://author-pXXXXX-eXXXXXXX.adobeaemcloud.com"
-      },
-      {
-        "component": "text",
-        "valueType": "string",
-        "name": "author",
-        "label": "Author"
-      },
-      {          
-        "component": "aem-content",
+        "component": "aem-content-fragment",
         "name": "theme_cf_reference",
         "label": "Brand Theme",
         "description": "Select the CF with authored values for the brand theme. This will be applied on the pages",
@@ -67,6 +33,8 @@
           "component": "select",
           "name": "theme",
           "label": "Theme",
+          "description": "Note: This takes priority over CF based theme.",
+
           "options": [
             {
               "name": "default",
@@ -87,6 +55,10 @@
              {
               "name": "Green Theme",
               "value": "green-theme"
+            },
+            {
+              "name": "WeHealthcare Theme",
+              "value": "wehealthcare-theme"
             }
           ]
       },
@@ -102,14 +74,21 @@
       {
         "component": "text",
         "valueType": "string",
-        "name": "pageName",
-        "label": "Page Name"
+        "name": "jcr:pagetitle",
+        "label": "Page Title"
       },
       {
         "component": "text",
         "valueType": "string",
         "name": "pageCategory",
         "label": "Page Category"
+      },
+      {
+        "component": "aem-tag",
+        "name": "cq:tags",
+        "label": "Tags",
+        "valueType": "string",
+        "rootPath": "/content/cq:tags/reference-demo"
       }
     ]
   },
@@ -212,6 +191,12 @@
   {
     "id": "section",
     "fields": [
+      {
+        "component": "text",
+        "name": "name",
+        "label": "Section Name",
+        "description": "The label shown for this section in the Content Tree"
+      },
       {
         "component": "select",
         "name": "sec-spacing",
@@ -358,8 +343,7 @@
           {
             "name": "Light Color",
             "value": "bg-light"
-          }
-          
+          }         
         ]
       },
       {
@@ -421,6 +405,29 @@
             "value": "teaser-card"
           }
         ]
+      },
+      {
+        "component": "select",
+        "name": "ctastyle",
+        "label": "CTA Style",
+        "options": [
+         {
+            "name": "Link",
+            "value": "cta-link"
+          },
+          {
+            "name": "Primary Button",
+            "value": "cta-button"
+          },
+          {
+            "name": "Secondary Button",
+            "value": "cta-button-secondary"
+          },
+          {
+            "name": "Dark Button",
+            "value": "cta-button-dark"
+          }
+        ]
       }
     ]
   },
@@ -454,36 +461,80 @@
     ]
   },
   {
-    "id": "contentfragment",
+    "id": "action-button",
     "fields": [
       {
         "component": "aem-content",
-        "name": "reference",
-        "label": "Reference",
         "valueType": "string",
-        "required": true,
+        "name": "link",
+        "label": "Link",
+        "multi": false,
         "validation": {
-            "rootPath": "/content/dam"
+            "rootPath": "/content"
         }
       },
       {
-        "component": "select",
-        "name": "style",
-        "label": "Choose Variation",
-        "options": [
-          {
-            "name": "Master",
-            "value": "master"
-          },
-            {
-            "name": "Mobile",
-            "value": "mobile"
-          }
-        ]
+        "component": "text",
+        "name": "label",
+        "value": "Button",
+        "label": "Label",
+        "valueType": "string"
+      },
+      {
+        "component": "text",
+        "name": "title",
+        "value": "Button",
+        "label": "Title",
+        "valueType": "string"
       },
       {
         "component": "select",
         "name": "style",
+        "label": "Style",
+        "options": [
+          {
+            "name": "Default",
+            "value": "default-button"
+          },
+          {
+            "name": "Link",
+            "value": "default-button-link"
+          },
+          {
+            "name": "Secondary Button",
+            "value": "default-button-secondary"
+          },
+          {
+            "name": "Dark Button",
+            "value": "default-button-dark"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "contentfragment",
+    "fields": [
+      {
+        "component": "aem-content-fragment",
+        "name": "reference",
+        "label": "Content Fragment Picker",
+        "valueType": "string",
+        "required": true,
+        "variationName": "contentFragmentVariation"
+      },
+      {
+        "component": "text",
+        "name": "contentFragmentVariation",
+        "label": "Selected Variation",
+        "value": "",
+        "valueType": "string",
+        "description": "Persisted variation for publish; leave empty for master.",
+        "condition": { "==": [ { "var": "__alwaysFalse" }, true ] }
+      },
+      {
+        "component": "select",
+        "name": "displaystyle",
         "label": "Style",
         "options": [
           {
@@ -505,6 +556,48 @@
           {
             "name": "Image Bottom",
             "value": "image-bottom"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "alignment",
+        "label": "Alignment",
+        "options": [
+          {
+            "name": "Text Left",
+            "value": "text-left"
+          },
+          {
+            "name": "Text Right",
+            "value": "text-right"
+          },
+          {
+            "name": "Text Center",
+            "value": "text-center"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "ctastyle",
+        "label": "CTA Style",
+        "options": [
+         {
+            "name": "Link",
+            "value": "cta-link"
+          },
+          {
+            "name": "Primary Button",
+            "value": "cta-button"
+          },
+          {
+            "name": "Secondary Button",
+            "value": "cta-button-secondary"
+          },
+          {
+            "name": "Dark Button",
+            "value": "cta-button-dark"
           }
         ]
       }
@@ -533,6 +626,220 @@
         "value": "",
         "label": "Text",
         "valueType": "string"
+      },
+      {
+            "component": "boolean",
+            "label": "Enable Underline in Title",
+            "description": "Enable underline in title",
+            "name": "enableunderline",
+            "value": "true",
+            "valueType": "boolean"
+      },
+      {
+        "component": "select",
+        "name": "herolayout",
+        "label": "Hero Layout Style",
+        "options": [
+          {
+            "name": "Default",
+            "value": "overlay"
+          },
+          {
+            "name": "Image Left",
+            "value": "image-left"
+          },
+          {
+            "name": "Image Right",
+            "value": "image-right"
+          },
+          {
+            "name": "Image-Background Text-Left",
+            "value": "image-background-text-left"
+          },
+          {
+            "name": "Image-Background Text-Right",
+            "value": "image-background-text-right"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "ctastyle",
+        "label": "CTA Style",
+        "options": [
+          {
+            "name": "Link",
+            "value": "link"
+          },
+          {
+            "name": "Button",
+            "value": "button"
+          },
+          {
+            "name": "Button secondary",
+            "value": "button-secondary"
+          },
+          {
+            "name": "Dark Button",
+            "value": "button-dark"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "backgroundstyle",
+        "label": "Background Style",
+        "options": [
+          {
+            "name": "Default",
+            "value": "default"
+          },
+          {
+            "name": "Theme Dark",
+            "value": "theme-dark"
+          },
+          {
+            "name": "Theme Light",
+            "value": "theme-light"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dm-openapi",
+    "fields": [
+      {
+          "component": "custom-asset-namespace:custom-asset",
+          "name": "image",
+          "label": "Image",
+          "configUrl": "/content/dam/refdemo-eds-dev/en/image.config.json",
+          "valueType": "string"
+      },
+      {
+          "component": "text",
+          "name": "imageTitle",
+          "label": "Alt Text",
+          "valueType": "string"
+      },
+      {
+          "component": "select",
+          "name": "preset",
+          "value": "na",
+          "label": "Preset",
+          "description": "Preset to be applied to the image. This preset needs to exist on the DM account if using any account other than DynamicMediaNA",
+          "valueType": "string",
+          "options": [
+            {
+              "name": "None",
+              "value": ""
+            },
+            {
+              "name": "PNG – Enhanced Clarity",
+              "value": "Always_Use_a_Preset"
+            }
+          ]
+      },
+      {
+          "condition": {
+              "==": [{ "var": "preset" }, ""]
+          },
+          "component": "select",
+          "name": "rotate",
+          "value": "",
+          "label": "Rotate",
+          "description": "Select the rotation which will rotate the image.",
+          "valueType": "string",
+          "options": [
+              {
+              "name": "None",
+              "value": ""
+              },
+              {
+              "name": "30",
+              "value": "30"
+              },
+              {
+              "name": "45",
+              "value": "45"
+              },
+              {
+              "name": "60",
+              "value": "60"
+              },
+              {
+              "name": "90",
+              "value": "90"
+              },
+              {
+              "name": "120",
+              "value": "120"
+              },
+              {
+              "name": "160",
+              "value": "160"
+              },
+              {
+              "name": "180",
+              "value": "180"
+              },
+              {
+              "name": "230",
+              "value": "230"
+              },
+              {
+              "name": "270",
+              "value": "270"
+              },
+              {
+              "name": "300",
+              "value": "300"
+              },
+              {
+              "name": "330",
+              "value": "330"
+              }
+          ]
+      },
+      {
+          "condition": {
+              "==": [{ "var": "preset" }, ""]
+          },
+          "component": "select",
+          "name": "flip",
+          "value": "",
+          "label": "Flip",
+          "description": "Select the flip for the image either vertical or horizontal or vertical & horizontal",
+          "valueType": "string",
+          "options": [
+              {
+              "name": "None",
+              "value": ""
+              },
+              {
+              "name": "Vertical",
+              "value": "v"
+              },
+              {
+              "name": "Horizontal",
+              "value": "h"
+              },
+              {
+              "name": "Horizontal & Vertical",
+              "value": "hv"
+              }
+          ]
+      },
+      {
+          "condition": {
+              "==": [{ "var": "preset" }, ""]
+          },
+          "component": "text",
+          "name": "crop",
+          "value": "",
+          "label": "Crop",
+          "description": "Crop the final image using four values: left, top, width, and height, all in percentages. For example, 10p,10p,50p,50p means crop the image starting 10% from the left and top, and take 50% of the image's width and height",
+          "valueType": "string"
       }
     ]
   },
@@ -569,16 +876,6 @@
           "multi": false,
           "description": "Select AEM DAM repository from asset selector if using Delivery Type as Dynamic Media. Select DM delivery repository from asset selector if using Delivery Type as Dynamic Media with OpenAPI",
           "required": true
-        },        
-        {
-          "condition": {
-            "===": [{ "var": "delivery_Type" }, "dm"]
-          },
-            "component": "text",
-            "name": "dmUrl",
-            "value": "https://smartimaging.scene7.com/is/image/DynamicMediaNA",
-            "label": "Dynamic Media URL",
-            "valueType": "string"
         },
         {
           "condition": {
@@ -690,12 +987,46 @@
     ]
   },
   {
+    "id": "quote",
+    "fields": [
+      {
+        "component": "richtext",
+        "valueType": "string",
+        "name": "quotation",
+        "value": "",
+        "label": "Quotation"
+      },
+      {
+        "component": "richtext",
+        "name": "attribution",
+        "value": "",
+        "label": "Attribution",
+        "valueType": "string"
+      }
+    ]
+  },
+  {
       "id": "search",
       "fields": [
         {
           "component": "aem-content",
           "name": "searchPath",
           "label": "Search Path"
+        },
+        {
+          "component": "select",
+          "name": "searchstyle",
+          "label": "Search Style",
+          "options": [
+            {
+              "name": "Search Bar",
+              "value": "search-bar"
+            },
+            {
+              "name": "Search Icon",
+              "value": "search-icon"
+            }
+          ]
         }
       ]
   },
@@ -854,7 +1185,7 @@
         "component": "text",
         "valueType": "string",
         "value": "Your text will show here.",
-        "name": "teaserBlurb",
+        "name": "title",
         "label": "Title"
       },
       {
@@ -954,7 +1285,7 @@
           {
             "component": "text",
             "valueType": "string",
-            "name": "btn-text",
+            "name": "buttonText",
             "value": "Button",
             "label": "Button Text"
           },
@@ -973,6 +1304,29 @@
             "name": "useSwoosh",
             "value": "true",
             "valueType": "boolean"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "ctastyle",
+        "label": "CTA Style",
+         "options": [
+          {
+            "name": "Link",
+            "value": "link"
+          },
+          {
+            "name": "Primary Button",
+            "value": "button"
+          },
+          {
+            "name": "Secondary Button",
+            "value": "button-secondary"
+          },
+          {
+            "name": "Dark Button",
+            "value": "button-dark"
           }
         ]
       }
@@ -2180,6 +2534,12 @@
             "valueType": "string"
           },
           {
+            "component": "boolean",
+            "label": "Allow multiple selection",
+            "name": "multiSelect",
+            "valueType": "boolean"
+          },
+          {
             "component": "select",
             "label": "Data type of submitted value",
             "name": "type",
@@ -2197,6 +2557,18 @@
               {
                 "name": "Number",
                 "value": "number"
+              },
+              {
+                "name": "String[]",
+                "value": "string[]"
+              },
+              {
+                "name": "Boolean[]",
+                "value": "boolean[]"
+              },
+              {
+                "name": "Number[]",
+                "value": "number[]"
               }
             ]
           },
@@ -2823,7 +3195,16 @@
             "component": "aem-content",
             "name": "fragmentPath",
             "label": "Fragment reference",
-            "valueType": "string"
+            "valueType": "string",
+            "validation": {
+              "rootPath": "/content/forms/af"
+            }
+          },
+          {
+            "component": "edit-fragment",
+            "name": "editFragment",
+            "label": "Edit Fragment",
+            "valueType": "boolean"
           }
         ]
       },
@@ -4141,6 +4522,84 @@
     ]
   },
   {
+    "id": "tabs",
+    "fields": [
+      {
+        "component": "select",
+        "name": "tabsstyle",
+        "label": "Tabs Style",
+        "options": [
+          {
+            "name": "Default",
+            "value": ""
+          },
+          {
+            "name": "Card Style",
+            "value": "card-style-tab"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tabs-item",
+    "fields": [
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "title",
+        "value": "",
+        "label": "Tab Title"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "content_heading",
+        "value": "",
+        "label": "Heading"
+      },
+      {
+        "component": "select",
+        "valueType": "string",
+        "name": "content_headingType",
+        "value": "",
+        "label": "Heading Type",
+        "options": [
+          {
+            "name": "H3",
+            "value": "h3"
+          },
+          {
+            "name": "H4",
+            "value": "h4"
+          },
+          {
+            "name": "H5",
+            "value": "h5"
+          },
+          {
+            "name": "H6",
+            "value": "h6"
+          }
+        ]
+      },
+      {
+        "component": "reference",
+        "valueType": "string",
+        "name": "content_image",
+        "label": "Image",
+        "multi": false
+      },
+      {
+        "component": "richtext",
+        "name": "content_richtext",
+        "value": "",
+        "label": "Content",
+        "valueType": "string"
+      }
+    ]
+  },
+  {
     "id": "form-submit-button",
     "fields": [
       {
@@ -5301,6 +5760,223 @@
     ]
   },
   {
+    "id": "range",
+    "fields": [
+      {
+        "component": "container",
+        "name": "basic",
+        "label": "Basic",
+        "collapsible": false,
+        "fields": [
+          {
+            "component": "text",
+            "name": "name",
+            "label": "Name",
+            "valueType": "string",
+            "required": true,
+            "valueFormat": "regexp",
+            "validation": {
+              "regExp": "^[^$].*",
+              "customErrorMsg": "Name cannot start with $"
+            }
+          },
+          {
+            "component": "text",
+            "name": "jcr:title",
+            "label": "Title",
+            "valueType": "string"
+          },
+          {
+            "component": "boolean",
+            "name": "hideTitle",
+            "label": "Hide title",
+            "valueType": "boolean"
+          },
+          {
+            "component": "datasource-bindref",
+            "name": "dataRef",
+            "label": "Bind reference",
+            "valueType": "string"
+          },
+          {
+            "component": "boolean",
+            "name": "unboundFormElement",
+            "label": "Mark as Unbound Form Element",
+            "valueType": "boolean"
+          },
+          {
+            "component": "boolean",
+            "name": "visible",
+            "label": "Show Component",
+            "valueType": "boolean",
+            "value": true
+          },
+          {
+            "component": "boolean",
+            "name": "enabled",
+            "label": "Enable Component",
+            "valueType": "boolean",
+            "value": true
+          },
+          {
+            "component": "boolean",
+            "name": "readOnly",
+            "label": "Read-only",
+            "valueType": "boolean"
+          },
+          {
+            "component": "select",
+            "name": "colspan",
+            "label": "Column Span",
+            "valueType": "string",
+            "value": "12",
+            "options": [
+              {
+                "name": "1 column",
+                "value": "1"
+              },
+              {
+                "name": "2 column",
+                "value": "2"
+              },
+              {
+                "name": "3 column",
+                "value": "3"
+              },
+              {
+                "name": "4 column",
+                "value": "4"
+              },
+              {
+                "name": "5 column",
+                "value": "5"
+              },
+              {
+                "name": "6 column",
+                "value": "6"
+              },
+              {
+                "name": "7 column",
+                "value": "7"
+              },
+              {
+                "name": "8 column",
+                "value": "8"
+              },
+              {
+                "name": "9 column",
+                "value": "9"
+              },
+              {
+                "name": "10 column",
+                "value": "10"
+              },
+              {
+                "name": "11 column",
+                "value": "11"
+              },
+              {
+                "name": "12 column",
+                "value": "12"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component": "container",
+        "name": "help",
+        "label": "Help Content",
+        "collapsible": true,
+        "fields": [
+          {
+            "component": "richtext",
+            "name": "description",
+            "label": "Help text",
+            "valueType": "string"
+          },
+          {
+            "component": "richtext",
+            "name": "tooltip",
+            "label": "Short description",
+            "valueType": "string"
+          }
+        ]
+      },
+      {
+        "component": "container",
+        "name": "validation",
+        "label": "Validation",
+        "collapsible": true,
+        "fields": [
+          {
+            "component": "boolean",
+            "name": "required",
+            "label": "Required",
+            "valueType": "boolean"
+          },
+          {
+            "component": "text",
+            "name": "mandatoryMessage",
+            "label": "Error message",
+            "valueType": "string",
+            "description": "Error message shown when required field is left empty."
+          },
+          {
+            "component": "text",
+            "name": "validateExpMessage",
+            "label": "Script validation message",
+            "valueType": "string",
+            "description": "Displayed when validation script fails."
+          },
+          {
+            "component": "number",
+            "name": "minimum",
+            "label": "Lowest number / Smallest number",
+            "valueType": "number",
+            "description": "Minimum number allowed in the field"
+          },
+          {
+            "component": "text",
+            "name": "minimumMessage",
+            "valueType": "string",
+            "label": "Minimum error message",
+            "description": "Error message shown when entered value is less than minimum."
+          },
+          {
+            "component": "number",
+            "name": "maximum",
+            "label": "Highest number / Largest number",
+            "valueType": "number",
+            "description": "Maximum number allowed in the field"
+          },
+          {
+            "component": "text",
+            "name": "maximumMessage",
+            "valueType": "string",
+            "label": "Maximum error message",
+            "description": "Error message shown when the entered value is more than maximum."
+          }
+        ]
+      },
+      {
+        "component": "container",
+        "name": "custom",
+        "label": "Custom Properties",
+        "collapsible": true,
+        "fields": [
+          {
+            "component": "number",
+            "name": "stepValue",
+            "label": "Step Value",
+            "valueType": "number",
+            "description": "Step value for the range"
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "rating",
     "fields": [
       {
@@ -5797,6 +6473,317 @@
             "valueType": "string"
           }
         ]
+      }
+    ]
+  },
+  {
+    "id": "forex",
+    "fields": [
+      {
+        "component": "select",
+        "name": "baseCurrency",
+        "value": "AUD",
+        "label": "Base Currency",
+        "valueType": "string",
+        "options": [
+          {
+            "name": "Australian Dollar",
+            "value": "AUD"
+          },
+          {
+            "name": "US Dollar",
+            "value": "USD"
+          },
+          {
+            "name": "Pound Sterling",
+            "value": "GBP"
+          },
+          {
+            "name": "Canadian Dollar",
+            "value": "CAD"
+          },
+          {
+            "name": "Euro",
+            "value": "EUR"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "accordion",
+    "fields": [
+      {
+        "component": "container",
+        "name": "basic",
+        "label": "Basic",
+        "collapsible": false,
+        "fields": [
+          {
+            "component": "text",
+            "name": "name",
+            "label": "Name",
+            "valueType": "string",
+            "required": true,
+            "valueFormat": "regexp",
+            "validation": {
+              "regExp": "^[^$].*",
+              "customErrorMsg": "Name cannot start with $"
+            }
+          },
+          {
+            "component": "text",
+            "name": "jcr:title",
+            "label": "Title",
+            "valueType": "string"
+          },
+          {
+            "component": "boolean",
+            "name": "hideTitle",
+            "label": "Hide title",
+            "valueType": "boolean"
+          },
+          {
+            "component": "datasource-bindref",
+            "name": "dataRef",
+            "label": "Bind reference",
+            "valueType": "string"
+          },
+          {
+            "component": "boolean",
+            "name": "unboundFormElement",
+            "label": "Mark as Unbound Form Element",
+            "valueType": "boolean"
+          },
+          {
+            "component": "boolean",
+            "name": "visible",
+            "label": "Show Component",
+            "valueType": "boolean",
+            "value": true
+          },
+          {
+            "component": "boolean",
+            "name": "enabled",
+            "label": "Enable Component",
+            "valueType": "boolean",
+            "value": true
+          },
+          {
+            "component": "boolean",
+            "name": "readOnly",
+            "label": "Read-only",
+            "valueType": "boolean"
+          },
+          {
+            "component": "select",
+            "name": "colspan",
+            "label": "Column Span",
+            "valueType": "string",
+            "value": "12",
+            "options": [
+              {
+                "name": "1 column",
+                "value": "1"
+              },
+              {
+                "name": "2 column",
+                "value": "2"
+              },
+              {
+                "name": "3 column",
+                "value": "3"
+              },
+              {
+                "name": "4 column",
+                "value": "4"
+              },
+              {
+                "name": "5 column",
+                "value": "5"
+              },
+              {
+                "name": "6 column",
+                "value": "6"
+              },
+              {
+                "name": "7 column",
+                "value": "7"
+              },
+              {
+                "name": "8 column",
+                "value": "8"
+              },
+              {
+                "name": "9 column",
+                "value": "9"
+              },
+              {
+                "name": "10 column",
+                "value": "10"
+              },
+              {
+                "name": "11 column",
+                "value": "11"
+              },
+              {
+                "name": "12 column",
+                "value": "12"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "component": "container",
+        "name": "help",
+        "label": "Help Content",
+        "collapsible": true,
+        "fields": [
+          {
+            "component": "richtext",
+            "name": "description",
+            "label": "Help text",
+            "valueType": "string"
+          },
+          {
+            "component": "richtext",
+            "name": "tooltip",
+            "label": "Short description",
+            "valueType": "string"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "accordion-item",
+    "fields": [
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "summary",
+        "value": "",
+        "label": "Summary"
+      },
+      {
+        "component": "richtext",
+        "name": "text",
+        "value": "",
+        "label": "Text",
+        "valueType": "string"
+      }
+    ]
+  },
+  {
+    "id": "find-a-doctor",
+    "fields": [
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "title",
+        "label": "Title",
+        "value": "Find a Doctor"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "subtitle",
+        "label": "Subtitle",
+        "value": "Search for healthcare providers in your area"
+      },
+      {
+        "component": "select",
+        "name": "layout",
+        "label": "Layout Style",
+        "valueType": "string",
+        "value": "default",
+        "options": [
+          {
+            "name": "Default",
+            "value": "default"
+          },
+          {
+            "name": "Compact",
+            "value": "compact"
+          },
+          {
+            "name": "Expanded",
+            "value": "expanded"
+          }
+        ]
+      },
+      {
+        "component": "select",
+        "name": "dataSourceType",
+        "label": "Data Source Type",
+        "valueType": "string",
+        "value": "content-fragments",
+        "options": [
+          {
+            "name": "Content Fragments",
+            "value": "content-fragments"
+          },
+          {
+            "name": "External API",
+            "value": "api"
+          }
+        ]
+      },
+        {
+          "component": "aem-content",
+          "name": "contentFragmentFolder",
+          "label": "Content Fragment Folder",
+          "description": "Select folder containing multiple doctor Content Fragments",
+          "valueType": "string",
+          "validation": {
+            "rootPath": "/content/dam"
+          },
+          "condition": { "==": [{ "var": "dataSourceType" }, "content-fragments"] }
+        },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "apiUrl",
+        "label": "API URL",
+        "description": "External API endpoint for doctor data",
+        "condition": { "==": [{ "var": "dataSourceType" }, "api"] }
+      },
+      {
+        "component": "boolean",
+        "name": "enableLocationSearch",
+        "label": "Enable Location Search",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableSpecialtyFilter",
+        "label": "Enable Specialty Filter",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableProviderNameSearch",
+        "label": "Enable Provider Name Search",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "boolean",
+        "name": "enableSubmitAction",
+        "label": "Enable Submit Action",
+        "value": "true",
+        "valueType": "boolean"
+      },
+      {
+        "component": "text",
+        "valueType": "string",
+        "name": "submitUrl",
+        "label": "Submit URL",
+        "description": "URL to redirect to when Book Appointment is clicked (if Submit Action is enabled)",
+        "condition": { "==": [{ "var": "enableSubmitAction" }, true] }
       }
     ]
   }

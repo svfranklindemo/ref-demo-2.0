@@ -1,5 +1,6 @@
 import { getMetadata } from '../../scripts/aem.js';
 import { isAuthorEnvironment, moveInstrumentation } from '../../scripts/scripts.js';
+import { getHostname } from '../../scripts/utils.js';
 
 /**
  * @param {HTMLElement} $block
@@ -11,8 +12,8 @@ export default async function decorate(block) {
   
   let configSrc = Array.from(block.children)[0]?.textContent?.trim(); //inline or cf
 
-  
-  if(configSrc === 'inline'){
+  //fallback default to inline mode
+  if(configSrc === 'inline' || !configSrc){
     // Get DM Url input
     let templateURL = inputs[1]?.textContent?.trim();
     let variablemapping = inputs[2]?.textContent?.trim();
@@ -97,21 +98,22 @@ export default async function decorate(block) {
       block.append(finalImg);
     }
     
-  } if(configSrc === 'cf'){
+  } else if(configSrc === 'cf'){
 
     //https://author-p153659-e1620914.adobeaemcloud.com/graphql/execute.json/wknd-universal/DynamicMediaTemplateByPath;path=
     const CONFIG = {
-      WRAPPER_SERVICE_URL: 'https://prod-31.westus.logic.azure.com:443/workflows/2660b7afa9524acbae379074ae38501e/triggers/manual/paths/invoke',
-      WRAPPER_SERVICE_PARAMS: 'api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=kfcQD5S7ovej9RHdGZFVfgvA-eEqNlb6r_ukuByZ64o',
-      GRAPHQL_QUERY: '/graphql/execute.json/wknd-universal/DynamicMediaTemplateByPath'
+      WRAPPER_SERVICE_URL: 'https://3635370-refdemoapigateway-stage.adobeioruntime.net/api/v1/web/ref-demo-api-gateway/fetch-cf',
+      GRAPHQL_QUERY: '/graphql/execute.json/ref-demo-eds/DynamicMediaTemplateByPath',
     };
+  
     
-    const hostname = getMetadata('hostname');	
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');	
     const aemauthorurl = getMetadata('authorurl') || '';
     
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '');  
     
-    const persistedquery = '/graphql/execute.json/wknd-universal/DynamicMediaTemplateByPath';
+    const persistedquery = '/graphql/execute.json/ref-demo-eds/DynamicMediaTemplateByPath';
 
     const contentPath = block.querySelector("p.button-container > a")?.textContent?.trim();
     const isAuthor = isAuthorEnvironment();
@@ -124,13 +126,13 @@ export default async function decorate(block) {
         headers: { 'Content-Type': 'application/json' }
       }
     : {
-        url: `${CONFIG.WRAPPER_SERVICE_URL}?${CONFIG.WRAPPER_SERVICE_PARAMS}`,
+        url: `${CONFIG.WRAPPER_SERVICE_URL}`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           graphQLPath: `${aempublishurl}${CONFIG.GRAPHQL_QUERY}`,
           cfPath: contentPath,
-          variation: 'master'
+          variation: `master;ts=${Date.now()}`
         })
       };
   

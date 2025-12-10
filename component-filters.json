@@ -9,22 +9,36 @@
     "id": "section",
     "components": [
       "button",
+      "action-button",
       "cards",
       "carousel",
       "columns",
       "contentfragment",
+      "button",
       "dm-asset",
       "dm-template",
       "fragment",
       "hero",
       "image",
+      "quote",
       "teaser",
       "text",
       "title",
       "video",
+      "search",
       "separator",
+      "tabs",
       "form",
-      "embed-adaptive-form"
+      "forex",
+      "accordion",
+      "embed-adaptive-form",
+      "find-a-doctor"
+    ]
+  },
+  {
+    "id": "accordion",
+    "components": [
+      "accordion-item"
     ]
   },
   {
@@ -49,13 +63,16 @@
     "id": "column",
     "components": [
       "button",
-      "dm-asset",
-      "dm-template",
       "image",
       "text",      
       "title",
-      "video",
-      "separator"
+      "video"
+    ]
+  },
+  {
+    "id": "tabs",
+    "components": [
+      "tabs-item"
     ]
   },
   {
@@ -84,7 +101,8 @@
       "telephone-input",
       "text-input",
       "tnc",
-      "wizard"
+      "wizard",
+      "range"
     ]
   }
 ]

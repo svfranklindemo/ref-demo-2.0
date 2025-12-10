@@ -182,8 +182,27 @@ function inputDecorator(field, element) {
       input.setAttribute('display-value', field.displayValue ?? '');
       input.type = 'text';
       input.value = field.displayValue ?? '';
-      input.addEventListener('touchstart', () => { input.type = field.type; }); // in mobile devices the input type needs to be toggled before focus
-      input.addEventListener('focus', () => handleFocus(input, field));
+      // Handle mobile touch events to enable native date picker
+      let isMobileTouch = false;
+      input.addEventListener('touchstart', () => {
+        isMobileTouch = true;
+        input.type = field.type;
+        // Set the edit value immediately to prevent empty field
+        const editValue = input.getAttribute('edit-value');
+        if (editValue) {
+          input.value = editValue;
+        }
+      });
+
+      input.addEventListener('focus', () => {
+        // Only change type on desktop or if not already changed by touchstart
+        if (!isMobileTouch && input.type !== field.type) {
+          input.type = field.type;
+        }
+        handleFocus(input, field);
+        // Reset mobile touch flag
+        isMobileTouch = false;
+      });
       input.addEventListener('blur', () => handleFocusOut(input));
     } else if (input.type !== 'file') {
       input.value = field.value ?? '';
@@ -227,26 +246,11 @@ function decoratePanelContainer(panelDefinition, panelContainer) {
 
   const shouldAddLabel = (container, panel) => panel.label && !container.querySelector(`legend[for=${container.dataset.id}]`);
 
-  const isContainerRepeatable = (container) => container.dataset?.repeatable === 'true' && container.dataset?.variant !== 'noButtons';
-
-  const needsAddButton = (container) => !container.querySelector(':scope > .repeat-actions');
-
-  const needsRemoveButton = (container) => !container.querySelector(':scope > .item-remove');
-
   if (isPanelWrapper(panelContainer)) {
     if (shouldAddLabel(panelContainer, panelDefinition)) {
       const legend = createLegend(panelDefinition);
       if (legend) {
         panelContainer.insertAdjacentElement('afterbegin', legend);
-      }
-    }
-
-    if (isContainerRepeatable(panelContainer)) {
-      if (needsAddButton(panelContainer)) {
-        insertAddButton(panelContainer, panelContainer);
-      }
-      if (needsRemoveButton(panelContainer)) {
-        insertRemoveButton(panelContainer, panelContainer);
       }
     }
   }
@@ -314,6 +318,10 @@ function enableValidation(form) {
   });
 }
 
+function isDocumentBasedForm(formDef) {
+  return formDef?.[':type'] === 'sheet' && formDef?.data;
+}
+
 async function createFormForAuthoring(formDef) {
   const form = document.createElement('form');
   await generateFormRendition(formDef, form, formDef.id, (container) => {
@@ -325,10 +333,11 @@ async function createFormForAuthoring(formDef) {
   return form;
 }
 
-export async function createForm(formDef, data) {
+export async function createForm(formDef, data, source = 'aem') {
   const { action: formPath } = formDef;
   const form = document.createElement('form');
   form.dataset.action = formPath;
+  form.dataset.source = source;
   form.noValidate = true;
   if (formDef.appliedCssClassNames) {
     form.className = formDef.appliedCssClassNames;
@@ -352,28 +361,31 @@ export async function createForm(formDef, data) {
   }
 
   enableValidation(form);
-  transferRepeatableDOM(form);
+  transferRepeatableDOM(form, formDef, form, formId);
 
-  if (afModule) {
+  if (afModule && typeof Worker === 'undefined') {
     window.setTimeout(async () => {
       afModule.loadRuleEngine(formDef, form, captcha, generateFormRendition, data);
     }, DELAY_MS);
   }
 
   form.addEventListener('reset', async () => {
-    const newForm = await createForm(formDef);
-    document.querySelector(`[data-action="${form?.dataset?.action}"]`)?.replaceWith(newForm);
+    const response = await createForm(formDef);
+    if (response?.form) {
+      document.querySelector(`[data-action="${form?.dataset?.action}"]`)?.replaceWith(response?.form);
+    }
   });
 
   form.addEventListener('submit', (e) => {
     handleSubmit(e, form, captcha);
   });
 
-  return form;
-}
-
-function isDocumentBasedForm(formDef) {
-  return formDef?.[':type'] === 'sheet' && formDef?.data;
+  return {
+    form,
+    captcha,
+    generateFormRendition,
+    data,
+  };
 }
 
 function cleanUp(content) {
@@ -449,6 +461,39 @@ export async function fetchForm(pathname) {
   return data;
 }
 
+function addRequestContextToForm(formDef) {
+  if (formDef && typeof formDef === 'object') {
+    formDef.properties = formDef.properties || {};
+
+    // Add URL parameters
+    try {
+      const urlParams = new URLSearchParams(window?.location?.search || '');
+      if (!formDef.properties.queryParams) {
+        formDef.properties.queryParams = {};
+      }
+      urlParams?.forEach((value, key) => {
+        formDef.properties.queryParams[key?.toLowerCase()] = value;
+      });
+    } catch (e) {
+      console.warn('Error reading URL parameters:', e);
+    }
+
+    // Add cookies
+    try {
+      const cookies = document?.cookie.split(';');
+      formDef.properties.cookies = {};
+      cookies?.forEach((cookie) => {
+        if (cookie.trim()) {
+          const [key, value] = cookie.trim().split('=');
+          formDef.properties.cookies[key.trim()] = value || '';
+        }
+      });
+    } catch (e) {
+      console.warn('Error reading cookies:', e);
+    }
+  }
+}
+
 export default async function decorate(block) {
   let container = block.querySelector('a[href]');
   let formDef;
@@ -480,12 +525,14 @@ export default async function decorate(block) {
       const transform = new DocBasedFormToAF();
       formDef = transform.transform(formDef);
       source = 'sheet';
-      form = await createForm(formDef);
+      const response = await createForm(formDef, null, source);
+      form = response?.form;
       const docRuleEngine = await import('./rules-doc/index.js');
       docRuleEngine.default(formDef, form);
       rules = false;
     } else {
       afModule = await import('./rules/index.js');
+      addRequestContextToForm(formDef);
       if (afModule && afModule.initAdaptiveForm && !block.classList.contains('edit-mode')) {
         form = await afModule.initAdaptiveForm(formDef, createForm);
       } else {
@@ -498,7 +545,7 @@ export default async function decorate(block) {
     form.dataset.source = source;
     form.dataset.rules = rules;
     form.dataset.id = formDef.id;
-    if (source === 'aem' && formDef.properties) {
+    if (source === 'aem' && formDef.properties && formDef.properties['fd:path']) {
       form.dataset.formpath = formDef.properties['fd:path'];
     }
     container.replaceWith(form);

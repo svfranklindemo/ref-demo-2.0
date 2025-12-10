@@ -6,8 +6,26 @@ import {
 export const PATH_PREFIX = '/language-masters';
 export const TAG_ROOT = 'wknd-universal:';
 //export const SITE_NAME = 'wknd-universal';
-export const SUPPORTED_LANGUAGES = ['en'];
+export const SUPPORTED_LANGUAGES = [
+  'en',    // English
+  'fr',    // French
+  'de',    // German
+  'es',    // Spanish
+  'it',    // Italian
+  'pt',    // Portuguese
+  'nl',    // Dutch
+  'sv',    // Swedish
+  'da',    // Danish
+  'ru',    // Russian
+  'ja',    // Japanese
+  'zh',    // Chinese (Simplified)
+  'zh_TW', // Chinese (Traditional)
+  'ko',    // Korean
+  'ar',    // Arabic
+  'he',    // Hebrew
+];
 export const INTERNAL_PAGES = ['/footer', '/nav', '/fragments', '/data', '/drafts'];
+
 let lang;
 import { fetchPlaceholders } from './aem.js';
 import { isAuthorEnvironment } from './scripts.js';
@@ -31,12 +49,59 @@ import { isAuthorEnvironment } from './scripts.js';
         const listOfAllPlaceholdersData = await fetchPlaceholders();
         const siteName = listOfAllPlaceholdersData?.siteName;
         if (siteName) {
-          return siteName;
+          return siteName.replaceAll('/content/', '');
         }
       }
     } catch (error) {
       console.warn('Error fetching placeholders for siteName:', error);
     }
+}
+
+
+/**
+ * Extracts the site name from the current URL pathname
+ * @description Extracts the site name from paths following the pattern /content/site-name/...
+ * For example:
+ * - From "/content/wknd-universal/language-masters/en/path" returns "wknd-universal"
+ * - From "/content/wknd-universal/language-masters/en/path/to/content.html" returns "wknd-universal"
+ * @returns {string} The site name extracted from the path, or empty string if not found
+ */
+export async function getHostname() {
+  try {
+    const listOfAllPlaceholdersData = await fetchPlaceholders();
+    const hostname = listOfAllPlaceholdersData?.hostname;
+    if (hostname) {
+      return hostname;
+    }
+  } catch (error) {
+    console.warn('Error fetching placeholders for hostname:', error);
+  }
+}
+
+/**
+ * Fetch the dynamic media server name from placeholder
+ * @description Fetches the dynamic media server URL from placeholder.
+ * @returns {string} The full URL of the dynamic media server with ending slash
+ */
+export async function getDynamicMediaServerURL() {
+  try {
+    const listOfAllPlaceholdersData = await fetchPlaceholders();
+    let dmurl = listOfAllPlaceholdersData?.dmurl;
+
+    if (dmurl) {
+      // Check if protocol is missing and prepend https:// if needed
+      if (!dmurl.startsWith('http://') && !dmurl.startsWith('https://')) {
+        dmurl = `https://${dmurl}`;
+      }
+      // Ensure URL ends with a trailing slash
+      if (!dmurl.endsWith('/')) {
+        dmurl = `${dmurl}/`;
+      }
+      return dmurl;
+    }
+  } catch (error) {
+    console.warn('Error fetching placeholders for dmurl:', error);
+  }
 }
 
 
@@ -66,7 +131,9 @@ export function getInheritedPageProperties() {
   if (!langCode) langCode = 'en'; // default to en
   // substring before lang
   const prefix = pathname.substring(0, pathname.indexOf(`/${langCode}`)) || '';
-  const suffix = pathname.substring(pathname.indexOf(`/${langCode}`) + langCode.length + 1) || '';
+  let suffix = pathname.substring(pathname.indexOf(`/${langCode}`) + langCode.length + 1) || '';
+  // Normalize to avoid leading slashes (prevents `//` in computed URLs)
+  if (suffix.startsWith('/')) suffix = suffix.replace(/^\/+/, '');
   return {
     prefix,
     suffix,
@@ -90,7 +157,7 @@ export function getPathDetails() {
      /content/wknd-universal/language-masters/en/path/to/content.html
      2 is the index of the language in the path for EDS paths like /en/path/to/content
     */
-  let langCode = isContentPath ? safeLangGet(3) : safeLangGet(0);
+  let langCode = isContentPath ? safeLangGet(4) : safeLangGet(1);
   // remove suffix from lang if any
   if (langCode.indexOf('.') > -1) {
     langCode = langCode.substring(0, langCode.indexOf('.'));
@@ -98,7 +165,8 @@ export function getPathDetails() {
   if (!langCode) langCode = 'en'; // default to en
   // substring before lang
   const prefix = pathname.substring(0, pathname.indexOf(`/${langCode}`)) || '';
-  const suffix = pathname.substring(pathname.indexOf(`/${langCode}`) + langCode.length + 1) || '';
+  let suffix = pathname.substring(pathname.indexOf(`/${langCode}`) + langCode.length + 1) || '';
+  if (suffix.startsWith('/')) suffix = suffix.replace(/^\/+/, '');
   return {
     prefix,
     suffix,
@@ -124,6 +192,78 @@ export function getLanguage() {
 export function setPageLanguage() {
   const currentLang = getLanguage();
   document.documentElement.lang = currentLang;
+}
+
+/**
+ * Compute the URL of the current page for a target language.
+ * Supports both EDS-style (/en/path) and AEM author (/content/{site}/language-masters/en/path.html)
+ */
+export function computeLocalizedUrl(targetLang) {
+  try {
+    if (!targetLang || typeof targetLang !== 'string') return window.location.href;
+    const { langCode, suffix, isContentPath } = getPathDetails();
+
+    const url = new URL(window.location.href);
+    const query = url.search || '';
+    const hash = url.hash || '';
+
+    if (!isContentPath) {
+      // EDS: /{lang}/{suffix}
+      const cleanSuffix = suffix ? suffix.replace(/^\/+/, '') : '';
+      if (targetLang.toLowerCase() === 'en' && !cleanSuffix) {
+        // Homepage → root
+        return `/${query}${hash}`.replace(/\/\/?(?=\?|#|$)/, '/');
+      }
+      const next = `/${targetLang}${cleanSuffix ? `/${cleanSuffix}` : ''}`;
+      return `${next}${query}${hash}`;
+    }
+
+    // AEM author: /content/{site}/language-masters/{lang}/{suffix}.html
+    // getSiteName can be async; fall back to path parsing if needed synchronously
+    const { pathname } = window.location;
+    const parts = pathname.split('/');
+    const siteNameFromPath = parts[2] || '';
+    const base = `/content/${siteNameFromPath}${PATH_PREFIX}/${targetLang}`;
+    // Normalize suffix:
+    // - treat ".html" (language root) as empty
+    // - strip any trailing .html from non-empty suffixes to avoid double extensions
+    const normalizedSuffix = (() => {
+      if (!suffix) return '';
+      const withoutLeadingSlashes = suffix.replace(/^\/+/, '');
+      // Remove one or more trailing ".html" occurrences
+      const strippedTrailingHtml = withoutLeadingSlashes.replace(/(?:\.html)+$/i, '');
+      // Treat purely ".html" (or repeated) as empty suffix
+      if (!strippedTrailingHtml || strippedTrailingHtml === '.') return '';
+      return strippedTrailingHtml;
+    })();
+    const withSuffix = normalizedSuffix ? `/${normalizedSuffix}` : '';
+    return `${base}${withSuffix}.html${query}${hash}`;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('computeLocalizedUrl failed', e);
+    return window.location.href;
+  }
+}
+
+/**
+ * Discover available languages from placeholders.
+ * Authors can set a row in placeholders with Key=languages and Text="en,fr,de".
+ * Falls back to ['en'] if not present.
+ */
+export async function discoverLanguagesFromPlaceholders() {
+  try {
+    const placeholders = await fetchPlaceholders();
+    const raw = placeholders.languages || placeholders.availableLanguages || '';
+    const parsed = String(raw)
+      .split(',')
+      .map((s) => s && s.trim())
+      .filter(Boolean);
+    if (parsed.length) return parsed;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('discoverLanguagesFromPlaceholders failed', e);
+  }
+  return ['en'];
 }
 
 export function formatDate(dObjStr) {
@@ -193,6 +333,78 @@ export async function fetchLanguageNavigation(langCode) {
     });
   }
   await window.navigationData[langCode];
+}
+
+/**
+ * Load and cache path mappings from paths.json to convert AEM content paths
+ * (e.g., /content/...) into site-relative paths (e.g., /en/...).
+ */
+let cachedPathMappings;
+export async function getPathMappings() {
+  if (cachedPathMappings) return cachedPathMappings;
+  try {
+    const resp = await fetch('/paths.json', { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return { mappings: [], includes: [] };
+    const json = await resp.json();
+    cachedPathMappings = {
+      mappings: Array.isArray(json.mappings) ? json.mappings.slice() : [],
+      includes: Array.isArray(json.includes) ? json.includes.slice() : [],
+    };
+    return cachedPathMappings;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to load /paths.json', e);
+    return { mappings: [], includes: [] };
+  }
+}
+
+/**
+ * Map a given AEM content path to a site-relative path using mappings from paths.json.
+ * - Chooses the longest matching source prefix.
+ * - Preserves the remaining suffix (without .html).
+ * - Always returns a leading slash path.
+ */
+export async function mapAemPathToSitePath(aemPath) {
+  try {
+    if (!aemPath || typeof aemPath !== 'string') return aemPath || '/';
+    const url = new URL(aemPath, window.location.origin);
+    let pathname = url.pathname || aemPath;
+    // Strip .html if present
+    pathname = pathname.replace(/\.html$/i, '');
+    const { mappings } = await getPathMappings();
+    if (!mappings || !mappings.length) return pathname;
+    // Find best match (longest src that is a prefix of pathname)
+    let best = null;
+    mappings.forEach((entry) => {
+      if (typeof entry !== 'string' || !entry.includes(':')) return;
+      const [srcRaw, destRaw] = entry.split(':');
+      const src = srcRaw.trim();
+      const dest = (destRaw || '').trim();
+      if (src && pathname.startsWith(src)) {
+        if (!best || src.length > best.src.length) {
+          best = { src, dest };
+        }
+      }
+    });
+    if (!best) return pathname;
+    const suffix = pathname.substring(best.src.length);
+    const join = (a, b) => {
+      if (!a) return b || '/';
+      if (!b) return a || '/';
+      const left = a.endsWith('/') ? a.slice(0, -1) : a;
+      const right = b.startsWith('/') ? b.slice(1) : b;
+      return `/${[left, right].filter(Boolean).join('/')}`.replace(/\/{2,}/g, '/');
+    };
+    let mapped = join(best.dest, suffix);
+    // Normalize to have leading slash and collapse double slashes
+    if (!mapped.startsWith('/')) mapped = `/${mapped}`;
+    mapped = mapped.replace(/\/{2,}/g, '/');
+    return mapped;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to map AEM path to site path', e);
+    return aemPath;
+  }
 }
 
 

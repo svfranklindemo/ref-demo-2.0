@@ -1,10 +1,12 @@
 import { getMetadata, fetchPlaceholders } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
+import { getHostname } from '../../scripts/utils.js';
+
 import {
   getNavigationMenu, formatNavigationJsonData,
 } from './navigation.js';
 import {
-  getLanguage, getSiteName, TAG_ROOT, PATH_PREFIX,
+  getLanguage, getSiteName, TAG_ROOT, PATH_PREFIX, SUPPORTED_LANGUAGES, computeLocalizedUrl, discoverLanguagesFromPlaceholders,
 } from '../../scripts/utils.js';
 import {
   button,
@@ -149,6 +151,11 @@ async function toggleMenu(nav, navSections, forceExpanded = null) {
 
 function settingAltTextForSearchIcon() {
   const searchImage = document.querySelector('.icon-search-light');
+  if (!searchImage) {
+    // eslint-disable-next-line no-console
+    console.debug('header: .icon-search-light not found; skipping search icon init');
+    return;
+  }
   searchImage.style.cursor = 'pointer';
   searchImage.addEventListener('click', () => {
     createSearchBox();
@@ -168,7 +175,7 @@ function handleEnterKey(event) {
   const inputValue = document.querySelector('.search-container input').value;
   //const url = (listOfAllPlaceholdersData.searchRedirectUrl || 'https://wknd.site/en/search?q=') + inputValue;
   
-  const url = `/content/${siteName}/language-masters/search-results.html?q=`+ inputValue;
+  const url = `/content/${siteName}/search-results.html?q=`+ inputValue;
 
   if (inputValue) window.location.href = url;
 }
@@ -227,7 +234,7 @@ function createSearchBox() {
     searchIcon.addEventListener('click', () => {
       if (searchInputBox.value) {
         ///window.location.href = (listOfAllPlaceholdersData.searchRedirectUrl || '<sitename>/en/search?q=') + searchInputBox.value;
-        window.location.href = `/content/${siteName}/language-masters/search-results.html?q=` + searchInputBox.value;
+        window.location.href = `/content/${siteName}/search-results.html?q=` + searchInputBox.value;
       }
     });
 
@@ -259,19 +266,23 @@ function createSearchBox() {
 function closeSearchBox() {
   const navWrapper = document.querySelector('.nav-wrapper');
   const headerWrapper = document.querySelector('.header-wrapper');
-  const searchContainer = headerWrapper.querySelector('.search-container');
-  const cancelContainer = navWrapper.querySelector('.cancel-container');
-  const overlay = document.querySelector('.overlay');
+  const searchContainer = headerWrapper ? headerWrapper.querySelector('.search-container') : null;
+  const cancelContainer = navWrapper ? navWrapper.querySelector('.cancel-container') : null;
+  // const overlay = document.querySelector('.overlay');
   //const searchImage = document.querySelector('.-light');
   const searchImage = document.querySelector('.icon-search-light');
-  if(searchContainer){
-    searchContainer.style.display = 'none';
-  }
+  // if(searchContainer){
+  //   searchContainer.style.display = 'none';
+  // }
   if(cancelContainer){
     cancelContainer.style.display = 'none';
   }
-  searchImage.style.display = 'flex';
-  overlay.style.display = 'none';
+  if (searchImage) {
+    searchImage.style.display = 'flex';
+  }
+  // if (overlay) {
+  //   overlay.style.display = 'none';
+  // }
   document.body.classList.remove('no-scroll');
 }
 
@@ -280,63 +291,33 @@ const closeSearchOnFocusOut = (e, navTools) => {
   const searchContainer = headerWrapper.querySelector('.search-container');
 
   if (searchContainer && searchContainer.style.display !== 'none') {
-    const cancelContainer = navTools.querySelector('.cancel-container');
-    const searchImage = navTools.querySelector('.icon-search-light');
-    const isClickInside = searchContainer.contains(e.target)
-      || cancelContainer.contains(e.target)
-      || searchImage.contains(e.target);
+    const cancelContainer = navTools ? navTools.querySelector('.cancel-container') : null;
+    const searchImage = navTools ? navTools.querySelector('.icon-search-light') : null;
+    const isClickInside = (searchContainer && searchContainer.contains && searchContainer.contains(e.target))
+    || (cancelContainer && cancelContainer.contains && cancelContainer.contains(e.target))
+    || (searchImage && searchImage.contains && searchImage.contains(e.target));
     if (!isClickInside) {
       closeSearchBox();
     }
   }
 };
 
-let listOfAllPlaceholdersData = [];
-
-
-
-async function makeImageClickableNSettingAltText(placeholderData) {
-    try {
-        const logoImage = document.querySelector('.nav-brand img');
-        const anchor = document.createElement('a');
-        Object.assign(anchor, {
-            href: placeholderData?.logoUrl || 'https://main--universal-demo--adobehols.aem.live/',
-            title: logoImage?.alt,
-        });
-        const picture = document.querySelector('.nav-brand picture');
-        if (picture) anchor.appendChild(picture);
-        const targetElement = document.querySelector('.nav-brand .default-content-wrapper');
-        if (targetElement) {
-            targetElement.appendChild(anchor);
-        }
-    } catch (error) {
-        console.error('Error in makeImageClickableNSettingAltText:', error);
-    }
-}
-
-async function fetchingPlaceholdersData() {
-    try {
-        listOfAllPlaceholdersData = await fetchPlaceholders();
-        await makeImageClickableNSettingAltText(listOfAllPlaceholdersData);
-        return true; // Indicate successful completion
-    } catch (error) {
-        console.error('Error in fetchingPlaceholdersData:', error);
-        listOfAllPlaceholdersData = []; // Set default value on error
-        return false; // Indicate failure
-    }
-}
-
-
-async function addLogoLink() {
+async function addLogoLink(langCode) {
 
   //urn:aemconnection:/content/wknd-universal/language-masters/en/magazine/jcr:content
-  const aueResource = document.body.getAttribute('data-aue-resource')?.replace(/^.*?(\/content.*?\/en).*$/, '$1');
+  const currentLang = langCode || getLanguage();
+  const aueResource = document.body.getAttribute('data-aue-resource')
+    ?.replace(new RegExp(`^.*?(\\/content.*?\\/${currentLang}).*$`), '$1');
   
   let logoLink = '';
     if(aueResource !== null && aueResource !== undefined && aueResource !== ''){
       logoLink = aueResource+'.html';
     } else {
-      logoLink = window.location.origin;
+      if(langCode === 'en') {
+        logoLink = window.location.origin;
+      } else {
+        logoLink = window.location.origin + `/${langCode}`;
+      }
     }
 
     try {
@@ -361,16 +342,16 @@ async function addLogoLink() {
 async function applyCFTheme(themeCFReference) {
    if (!themeCFReference) return;
   
-  // Configuration
   const CONFIG = {
-    WRAPPER_SERVICE_URL: 'https://prod-31.westus.logic.azure.com:443/workflows/2660b7afa9524acbae379074ae38501e/triggers/manual/paths/invoke',
-    WRAPPER_SERVICE_PARAMS: 'api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=kfcQD5S7ovej9RHdGZFVfgvA-eEqNlb6r_ukuByZ64o',
-    GRAPHQL_QUERY: '/graphql/execute.json/wknd-universal/BrandThemeByPath',
+    WRAPPER_SERVICE_URL: 'https://3635370-refdemoapigateway-stage.adobeioruntime.net/api/v1/web/ref-demo-api-gateway/fetch-cf',
+    GRAPHQL_QUERY: '/graphql/execute.json/ref-demo-eds/BrandThemeByPath',
     EXCLUDED_THEME_KEYS: new Set(['brandSite', 'brandLogo'])
   };
+
   try {
     const decodedThemeCFReference = decodeURIComponent(themeCFReference);
-    const hostname = getMetadata('hostname');
+    const hostnameFromPlaceholders = await getHostname();
+    const hostname = hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname');
     const aemauthorurl = getMetadata('authorurl') || '';
     const aempublishurl = hostname?.replace('author', 'publish')?.replace(/\/$/, '');
     const isAuthor = isAuthorEnvironment();
@@ -383,13 +364,13 @@ async function applyCFTheme(themeCFReference) {
           headers: { 'Content-Type': 'application/json' }
         }
       : {
-          url: `${CONFIG.WRAPPER_SERVICE_URL}?${CONFIG.WRAPPER_SERVICE_PARAMS}`,
+          url: `${CONFIG.WRAPPER_SERVICE_URL}`,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             graphQLPath: `${aempublishurl}${CONFIG.GRAPHQL_QUERY}`,
             cfPath: decodedThemeCFReference,
-            variation: "master"
+            variation: `master;ts=${Date.now()}`
           })
         };
 
@@ -462,7 +443,15 @@ export default async function decorate(block) {
   
   const navMeta = getMetadata('nav');
   const langCode = getLanguage();
-  const navPath = navMeta ? new URL(navMeta, window.location).pathname : `/content/${siteName}${PATH_PREFIX}/nav`;
+  console.log("langCode :"+langCode);
+
+   const isAuthor = isAuthorEnvironment();
+    let navPath =`/${langCode}/nav`;
+  
+    if(isAuthor){
+      navPath = navMeta ? new URL(navMeta, window.location).pathname : `/content/${siteName}${PATH_PREFIX}/${langCode}/nav`;
+    }
+   
 
   
   //const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
@@ -512,13 +501,93 @@ export default async function decorate(block) {
   const navTools = nav.querySelector('.nav-tools');
   if (navTools) {
     const contentWrapper = nav.querySelector('.nav-tools > div[class = "default-content-wrapper"]');
-    
+    // Language switcher (minimal UI)
+    try {
+      const currentLang = getLanguage();
+      const langWrap = document.createElement('div');
+      langWrap.className = 'lang-switcher';
+      const langBtn = document.createElement('button');
+      langBtn.type = 'button';
+      langBtn.className = 'lang-button';
+      langBtn.setAttribute('aria-haspopup', 'listbox');
+      langBtn.setAttribute('aria-expanded', 'false');
+      langBtn.textContent = currentLang.toUpperCase();
+      const langMenu = document.createElement('ul');
+      langMenu.className = 'lang-menu';
+      langMenu.setAttribute('role', 'listbox');
+      const langs = await discoverLanguagesFromPlaceholders();
+      const uniqueLangs = [...new Set(langs && langs.length ? langs : ['en'])];
+      if (uniqueLangs.length <= 1) {
+        langBtn.setAttribute('disabled', 'true');
+        langWrap.classList.add('single-lang');
+      }
+      const regionNames = (() => {
+        try { return new Intl.DisplayNames([navigator.language || 'en'], { type: 'region' }); } catch (e) { return null; }
+      })();
+      const languageNames = (() => {
+        try { return new Intl.DisplayNames([navigator.language || 'en'], { type: 'language' }); } catch (e) { return null; }
+      })();
+
+      uniqueLangs.forEach((raw) => {
+        const code = String(raw).replace('_', '-').toLowerCase();
+        const [langPart, regionPart] = code.split('-');
+        const displayCode = `${langPart}${regionPart ? `-${regionPart}` : ''}`.toUpperCase();
+        const country = regionPart ? (regionNames ? regionNames.of(regionPart.toUpperCase()) : regionPart.toUpperCase())
+          : (languageNames ? languageNames.of(langPart) : langPart.toUpperCase());
+
+        const li = document.createElement('li');
+        li.className = 'lang-item';
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', langPart === currentLang ? 'true' : 'false');
+
+        const link = document.createElement('a');
+        // Use only language segment for routing if site paths are language-based
+        link.href = computeLocalizedUrl(langPart);
+
+        const pre = document.createElement('span');
+        pre.className = 'lang-pretitle';
+        pre.textContent = displayCode;
+
+        const name = document.createElement('span');
+        name.className = 'lang-country';
+        name.textContent = country;
+
+        link.append(name, pre);
+        li.append(link);
+        langMenu.append(li);
+      });
+      langBtn.addEventListener('click', () => {
+        const expanded = langBtn.getAttribute('aria-expanded') === 'true';
+        langBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        langWrap.classList.toggle('open', !expanded);
+      });
+      document.addEventListener('click', (e) => {
+        if (!langWrap.contains(e.target)) {
+          langBtn.setAttribute('aria-expanded', 'false');
+          langWrap.classList.remove('open');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          langBtn.setAttribute('aria-expanded', 'false');
+          langWrap.classList.remove('open');
+        }
+      });
+      langWrap.append(langBtn, langMenu);
+      const targetContainer = contentWrapper || navTools;
+      targetContainer.append(langWrap);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Language switcher init failed', e);
+    }
     // Close Search Container on Focus out
     document.addEventListener('click', (e) => {
       closeSearchOnFocusOut(e, navTools);
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
+        const headerWrapper = document.querySelector('.header-wrapper');
+        const searchContainer = headerWrapper ? headerWrapper.querySelector('.search-container') : null;
         if (searchContainer && searchContainer.style.display !== 'none' && searchContainer.contains(e.target)) {
           closeSearchBox();
         }
@@ -545,5 +614,17 @@ export default async function decorate(block) {
   block.append(navWrapper);
   settingAltTextForSearchIcon();
   //fetchingPlaceholdersData();
-  addLogoLink();
+  addLogoLink(langCode);
+    // Ensure search icon mask uses correct base path in UE/author/local
+    try {
+      const iconEl = document.querySelector('header .search.search-icon .icon');
+      if (iconEl && window.hlx && window.hlx.codeBasePath) {
+        const iconUrl = `${window.hlx.codeBasePath}/icons/search.svg`;
+        iconEl.style.webkitMask = `url(${iconUrl}) no-repeat center / contain`;
+        iconEl.style.mask = `url(${iconUrl}) no-repeat center / contain`;
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.debug('search icon mask init skipped', e);
+    }
 }

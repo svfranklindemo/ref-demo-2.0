@@ -24,7 +24,25 @@ import {
   formatDate,
   setPageLanguage,
   PATH_PREFIX,
+  createSource,
+  getHostname
 } from './utils.js';
+
+function addPreconnect(origin) {
+  try {
+    if (!origin) return;
+    const href = String(origin);
+    if (!href.startsWith('http')) return;
+    if (document.querySelector(`link[rel="preconnect"][href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = href;
+    link.crossOrigin = '';
+    document.head.appendChild(link);
+  } catch (e) {
+    /* noop */
+  }
+}
 
 
 /**
@@ -123,6 +141,75 @@ function buildAutoBlocks() {
 }
 
 /**
+ * Create section background image from section[data-image].
+ * Optionally supports data-tab-image and data-mob-image for responsive overrides.
+ * Idempotent: will not duplicate if already enhanced.
+ */
+function decorateSectionImages(doc) {
+  const sections = doc.querySelectorAll('main .section[data-image]');
+  sections.forEach((section) => {
+    if (section.querySelector('picture.section-bg')) return; // already enhanced
+
+    const desktopSrc = section.dataset.image?.trim();
+    if (!desktopSrc) return;
+
+    const tabletSrc = section.dataset.tabImage?.trim();
+    const mobileSrc = section.dataset.mobImage?.trim();
+
+    const pic = picture();
+    pic.className = 'section-bg';
+
+    // WebP sources for breakpoints (prefer authored overrides if present)
+    const desktopCandidate = desktopSrc;
+    const tabletCandidate = tabletSrc || desktopSrc;
+    const mobileCandidate = mobileSrc || tabletSrc || desktopSrc;
+
+    // Desktop
+    try {
+      pic.appendChild(source({ srcset: `${new URL(desktopCandidate, window.location.href).pathname}?width=1400&format=webply&optimize=medium`, type: 'image/webp', media: '(min-width: 992px)' }));
+    } catch (e) { /* ignore malformed URL */ }
+    // Tablet
+    try {
+      pic.appendChild(source({ srcset: `${new URL(tabletCandidate, window.location.href).pathname}?width=1024&format=webply&optimize=medium`, type: 'image/webp', media: '(min-width: 768px)' }));
+    } catch (e) { /* ignore malformed URL */ }
+    // Mobile
+    try {
+      pic.appendChild(source({ srcset: `${new URL(mobileCandidate, window.location.href).pathname}?width=768&format=webply&optimize=medium`, type: 'image/webp', media: '(min-width: 320px)' }));
+    } catch (e) { /* ignore malformed URL */ }
+
+    // Fallback <img> uses authored URL (keeps original format/params)
+    const fallbackImg = img({ src: desktopSrc, alt: '', class: 'sec-img', loading: 'lazy' });
+    pic.appendChild(fallbackImg);
+
+    // Mark and insert as first child
+    section.classList.add('section-has-bg');
+    section.prepend(pic);
+
+    // Compute and lock section height to image height (based on current width)
+    const updateHeight = () => {
+      if (fallbackImg.naturalWidth > 0 && fallbackImg.naturalHeight > 0) {
+        const ratio = fallbackImg.naturalHeight / fallbackImg.naturalWidth;
+        const width = section.getBoundingClientRect().width;
+        const height = Math.round(width * ratio);
+        section.style.minHeight = '';
+        section.style.height = `${height}px`;
+      }
+    };
+
+    if (fallbackImg.complete) {
+      updateHeight();
+    } else {
+      fallbackImg.addEventListener('load', updateHeight, { once: true });
+    }
+
+    // Recalculate on viewport changes
+    const onResize = () => updateHeight();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+  });
+}
+
+/**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
  */
@@ -195,6 +282,7 @@ async function renderWBDataLayer() {
   //const config = await fetchPlaceholders();
   const lastPubDateStr = getMetadata('published-time');
   const firstPubDateStr = getMetadata('content_date') || lastPubDateStr;
+  const hostnameFromPlaceholders = await getHostname();
   window.wbgData.page = {
     pageInfo: {
       pageCategory: getMetadata('pagecategory'),
@@ -203,7 +291,7 @@ async function renderWBDataLayer() {
       contentType: getMetadata('content_type'),
       pageUid: getMetadata('pageuid'),
       pageName: getMetadata('pagename'),
-      hostName: getMetadata('hostname'),
+      hostName: hostnameFromPlaceholders ? hostnameFromPlaceholders : getMetadata('hostname'),
       pageFirstPub: formatDate(firstPubDateStr),
       pageLastMod: formatDate(lastPubDateStr),
       webpackage: '',
@@ -216,8 +304,18 @@ async function renderWBDataLayer() {
  * @param {Element} doc The container element
  */
 async function loadEager(doc) {
-  //setPageLanguage();
-  document.documentElement.lang = 'en';
+  setPageLanguage();
+  // Preconnect dynamically to speed up LCP fetch without hardcoding hosts
+  try {
+    addPreconnect(window.location.origin);
+    const lcpImg = doc.querySelector('main img');
+    if (lcpImg?.src) {
+      const u = new URL(lcpImg.src, window.location.href);
+      addPreconnect(u.origin);
+    }
+  } catch (e) {
+    // ignore
+  }
   decorateTemplateAndTheme();
   renderWBDataLayer();
   const main = doc.querySelector('main');
@@ -238,17 +336,60 @@ async function loadEager(doc) {
 }
 
 /**
+ * Create section background image
+ *
+ * @param {*} doc
+ */
+// function decorateSectionImages(doc) {
+//   const sectionImgContainers = doc.querySelectorAll('main .section[data-image]');
+//   sectionImgContainers.forEach((sectionImgContainer) => {
+//     const sectionImg = sectionImgContainer.dataset.image;
+//     const sectionTabImg = sectionImgContainer.dataset.tabImage;
+//     const sectionMobImg = sectionImgContainer.dataset.mobImage;
+//     let defaultImgUrl = null;
+
+//     const newPic = document.createElement('picture');
+//     if (sectionImg) {
+//       newPic.appendChild(createSource(sectionImg, 1920, '(min-width: 1024px)'));
+//       defaultImgUrl = sectionImg;
+//     }
+
+//     if (sectionTabImg) {
+//       newPic.appendChild(createSource(sectionTabImg, 1024, '(min-width: 768px)'));
+//       defaultImgUrl = sectionTabImg;
+//     }
+
+//     if (sectionMobImg) {
+//       newPic.appendChild(createSource(sectionTabImg, 600, '(max-width: 767px)'));
+//       defaultImgUrl = sectionMobImg;
+//     }
+
+//     const newImg = document.createElement('img');
+//     newImg.src = defaultImgUrl;
+//     newImg.alt = '';
+//     newImg.className = 'sec-img';
+//     newImg.loading = 'lazy';
+//     newImg.width = '768';
+//     newImg.height = '100%';
+
+//     if (defaultImgUrl) {
+//       newPic.appendChild(newImg);
+//       sectionImgContainer.prepend(newPic);
+//     }
+//   });
+// }
+
+/**
  * Loads everything that doesn't need to be delayed.
  * @param {Element} doc The container element
  */
 async function loadLazy(doc) {
   const main = doc.querySelector('main');
   await loadSections(main);
-
+  decorateSectionImages(doc);
   const { hash } = window.location;
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
   if (hash && element) element.scrollIntoView();
-
   loadHeader(doc.querySelector('header'));
   loadFooter(doc.querySelector('footer'));
 
@@ -273,9 +414,14 @@ export function decorateDMImages(main) {
         let rotate = '';
         let flip = '';
         let crop = '';
-        if(blockBeingDecorated){
+        if(blockBeingDecorated && blockBeingDecorated.classList){
             blockName = Array.from(blockBeingDecorated.classList).find(className => className !== 'block');
         }
+       const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.ogg', '.m4v', '.mkv'];
+       const isVideoAsset = videoExtensions.some(ext => url.href.toLowerCase().includes(ext));
+       // Skip blocks that handle their own image decoration
+       const excludedBlocks = ['video', 'carousel', 'cards'];
+       if (isVideoAsset || excludedBlocks.includes(blockName)) return;
         if(blockName && blockName === 'dynamicmedia-image'){
           rotate = blockBeingDecorated?.children[3]?.textContent?.trim();
           flip = blockBeingDecorated?.children[4]?.textContent?.trim();
