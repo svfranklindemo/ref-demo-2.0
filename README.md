@@ -1,4 +1,4 @@
-# Reference Demo 2.0 (For AEM Edge Delivery Service)
+# Reference Demo 2.0 (AEM Edge Delivery Service)
 
 **A modern looking WKND experience:**
 - Custom Themes (with and without code)
